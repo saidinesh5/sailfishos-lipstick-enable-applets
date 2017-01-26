@@ -1,0 +1,95 @@
+diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/share/lipstick-jolla-home-qt5/compositor.qml
+--- original/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-01-26 05:47:10.000000000 +0530
++++ patched/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-01-26 05:48:33.645446357 +0530
+@@ -131,7 +131,7 @@
+     property int homeOrientation: Qt.PortraitOrientation
+ 
+     property bool directRendering: appLayer.active && !homeLayer.visible && topmostWindow && topmostWindow.window && !topmostWindow.window.isInProcess
+-                                   && !(dialogLayer.contentItem.children.length > 1 || alarmLayer.contentItem.children.length > 1 || notificationLayer.contentItem.children.length || launcherLayer.visible || overlayLayer.contentItem.childrenRect.width || overlayLayer.contentItem.childrenRect.height)
++                                   && !(dialogLayer.contentItem.children.length > 1 || alarmLayer.contentItem.children.length > 1 || appletLayer.contentItem.children.length > 1 || notificationLayer.contentItem.children.length || launcherLayer.visible || overlayLayer.contentItem.childrenRect.width || overlayLayer.contentItem.childrenRect.height)
+     fullscreenSurface: directRendering ? topmostWindow.window.surface : null
+     screenOrientation: orientationLock == "portrait" ? Qt.PortraitOrientation : (orientationLock == "landscape" ? Qt.LandscapeOrientation : QtQuick.Screen.primaryOrientation)
+     keymap: Keymap {
+@@ -348,6 +348,9 @@
+             break
+         }
+ 
++        if(window.category === "applet")
++            window.takeFocus()
++
+         focusTransientInLocalScope(window, transientWindow)
+     }
+ 
+@@ -423,6 +426,10 @@
+         else if (dialogLayer.window) windows.push(dialogLayer.window.window)
+         else if (topmostWindow) windows.push(topmostWindow.window)
+ 
++        var applets = appletLayer.contentItem.children
++        for (var ii = 0; ii < applets.length; ++ii)
++            windows.push(applets[ii].window)
++
+         var overlays = overlayLayer.contentItem.children
+         for (var ii = 0; ii < overlays.length; ++ii)
+             windows.push(overlays[ii].window)
+@@ -1031,6 +1038,16 @@
+             }
+         }
+ 
++        Item {
++            id: appletLayer
++
++            property alias contentItem: appletLayer
++            anchors.fill: root
++
++            onChildrenChanged: updateWindows()
++            visible: !root.deviceIsLocked && !root.screenIsLocked
++        }
++
+         OverlayLayer {
+             id: overlayLayer
+         }
+@@ -1096,6 +1113,7 @@
+         var isShutdownWindow = window.isInProcess && window.title == "Shutdown"
+         var isPowerWindow = window.isInProcess && window.category == "power"
+         var isEventsWindow = window.isInProcess && window.category == "events"
++        var isAppletWindow = window.category == "applet"
+         var isDialogWindow = window.category == "dialog"
+         var isNotificationWindow = window.category == "notification"
+         var isOverlayWindow = window.category == "overlay"
+@@ -1130,6 +1148,9 @@
+         } else if (isDialogWindow) {
+             parent = dialogLayer
+             type = WindowType.Dialog
++        } else if (isAppletWindow) {
++            parent = appletLayer
++            parentItem = appletLayer.contentItem
+         } else if (isNotificationWindow) {
+             parent = notificationLayer
+             if (!onlyCurrentNotificationAllowed) {
+@@ -1153,7 +1174,7 @@
+             return
+         }
+ 
+-        window.focusOnTouch = !window.isInProcess && !isOverlayWindow && !isNotificationWindow
++        window.focusOnTouch = !window.isInProcess && !isOverlayWindow && !isNotificationWindow && !isAppletWindow
+ 
+         // reparenting already handled (window is transient to another window)
+         if (isApplicationWindow && window.parent !== root.contentItem) {
+@@ -1195,6 +1216,7 @@
+             // Force notification of clipboard changes to keyboard
+             window.surface.updateSelection()
+             root.clipboard.dataChanged.connect(window.surface.updateSelection)
++        } else if (isAppletWindow) {
+         } else if (isNotificationWindow) {
+         } else if (isAlarmWindow) {
+             if (!root.visible) {
+@@ -1267,6 +1289,9 @@
+             homeLayerItem.partnerWindowLowered(window.userData)
+             break
+         }
++
++        if(window.category == "applet")
++            clearKeyboardFocus()
+     }
+     onWindowHidden: {
+         if (window.category == "cover" || window.category == "silica-cover")

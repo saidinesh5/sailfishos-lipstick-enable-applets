@@ -1,0 +1,8 @@
+{
+    "name": "Enable applets",
+    "description": "A homescreen patch to enable support for overlay windows",
+    "category": "homescreen",
+    "infos": {
+        "maintainer": "saidinesh5"
+    }
+}
