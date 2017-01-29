@@ -1,0 +1,5 @@
+* Sat Jan 28 2017 Dinesh Manajipet <saidinesh5@gmail.com> 0.0.2-1
+- Fixed the reparenting of virtual keyboard(Overlay layer) to appletLayer when raised.
+
+* Fri Jan 27 2017 Dinesh Manajipet <saidinesh5@gmail.com> 0.0.1-1
+- Initial implementation of Applets Layer for lipstick
