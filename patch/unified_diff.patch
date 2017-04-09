@@ -1,6 +1,6 @@
 diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/share/lipstick-jolla-home-qt5/compositor.qml
---- original/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-01-26 05:47:10.000000000 +0530
-+++ patched/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-01-29 05:49:55.000000000 +0530
+--- original/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-04-09 22:03:56.000000000 +0530
++++ patched/usr/share/lipstick-jolla-home-qt5/compositor.qml	2017-04-09 22:52:12.000000000 +0530
 @@ -71,6 +71,7 @@
      property alias launcherLayer: launcherLayerItem
      property alias homeLayer: homeLayerItem
@@ -18,19 +18,32 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
      fullscreenSurface: directRendering ? topmostWindow.window.surface : null
      screenOrientation: orientationLock == "portrait" ? Qt.PortraitOrientation : (orientationLock == "landscape" ? Qt.LandscapeOrientation : QtQuick.Screen.primaryOrientation)
      keymap: Keymap {
-@@ -348,6 +349,11 @@
+@@ -156,9 +157,10 @@
+     // True when the user is peeking through to the home window
+     property bool homePeeking: !homeActive && homePeek
+ 
+-    readonly property bool topmostWindowRequestsGesturesDisabled: topmostWindow && topmostWindow.window
++    readonly property bool topmostWindowRequestsGesturesDisabled: (topmostWindow && topmostWindow.window
+                                                                   && topmostWindow.window.surface
+-                                                                  && (topmostWindow.window.surface.windowFlags & 1)
++                                                                  && (topmostWindow.window.surface.windowFlags & 1))
++                                                                  || (appletLayer.raised && (appletLayer.raisedWindow.surface.windowFlags & 1))
+ 
+     readonly property bool topmostIsDialog: dialogLayerItem.active
+     readonly property bool systemGesturesDisabled: !lockScreenLayer.active && (topmostIsDialog || topmostWindowRequestsGesturesDisabled)
+@@ -348,6 +350,11 @@
              break
          }
  
 +        if(window.category === "applet") {
-+            appletLayer.raised = true
++            appletLayer.raisedWindow = window
 +            window.takeFocus()
 +        }
 +
          focusTransientInLocalScope(window, transientWindow)
      }
  
-@@ -423,6 +429,10 @@
+@@ -423,6 +430,10 @@
          else if (dialogLayer.window) windows.push(dialogLayer.window.window)
          else if (topmostWindow) windows.push(topmostWindow.window)
  
@@ -41,7 +54,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
          var overlays = overlayLayer.contentItem.children
          for (var ii = 0; ii < overlays.length; ++ii)
              windows.push(overlays[ii].window)
-@@ -976,6 +986,7 @@
+@@ -976,6 +987,7 @@
                  }
              }
  
@@ -49,7 +62,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
              Item {
                  id: powerKeyStackBackground
                  anchors.fill: parent
-@@ -1031,6 +1042,19 @@
+@@ -1031,6 +1043,20 @@
              }
          }
  
@@ -58,9 +71,10 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
 +
 +            property alias contentItem: appletLayer
 +            property alias overlayItem: appletLayer
-+            property bool raised
++            property Item raisedWindow: null
++            property bool raised: raisedWindow != null
 +
-+            anchors.fill: root
++            anchors.fill: parent
 +
 +            onChildrenChanged: updateWindows()
 +            visible: !root.deviceIsLocked && !root.screenIsLocked
@@ -69,7 +83,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
          OverlayLayer {
              id: overlayLayer
          }
-@@ -1096,6 +1120,7 @@
+@@ -1096,6 +1122,7 @@
          var isShutdownWindow = window.isInProcess && window.title == "Shutdown"
          var isPowerWindow = window.isInProcess && window.category == "power"
          var isEventsWindow = window.isInProcess && window.category == "events"
@@ -77,7 +91,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
          var isDialogWindow = window.category == "dialog"
          var isNotificationWindow = window.category == "notification"
          var isOverlayWindow = window.category == "overlay"
-@@ -1130,6 +1155,9 @@
+@@ -1130,6 +1157,9 @@
          } else if (isDialogWindow) {
              parent = dialogLayer
              type = WindowType.Dialog
@@ -87,7 +101,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
          } else if (isNotificationWindow) {
              parent = notificationLayer
              if (!onlyCurrentNotificationAllowed) {
-@@ -1153,7 +1181,7 @@
+@@ -1153,7 +1183,7 @@
              return
          }
  
@@ -96,7 +110,7 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
  
          // reparenting already handled (window is transient to another window)
          if (isApplicationWindow && window.parent !== root.contentItem) {
-@@ -1195,6 +1223,7 @@
+@@ -1195,6 +1225,7 @@
              // Force notification of clipboard changes to keyboard
              window.surface.updateSelection()
              root.clipboard.dataChanged.connect(window.surface.updateSelection)
@@ -104,21 +118,22 @@ diff -ur original/usr/share/lipstick-jolla-home-qt5/compositor.qml patched/usr/s
          } else if (isNotificationWindow) {
          } else if (isAlarmWindow) {
              if (!root.visible) {
-@@ -1267,6 +1296,11 @@
+@@ -1267,6 +1298,12 @@
              homeLayerItem.partnerWindowLowered(window.userData)
              break
          }
 +
 +        if(window.category == "applet") {
 +            clearKeyboardFocus()
-+            appletLayer.raised = false
++            if(appletLayer.raisedWindow == window)
++                appletLayer.raisedWindow = null
 +        }
      }
      onWindowHidden: {
          if (window.category == "cover" || window.category == "silica-cover")
 diff -ur original/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml patched/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml
---- original/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml	2017-01-22 00:41:28.000000000 +0530
-+++ patched/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml	2017-01-29 05:48:51.000000000 +0530
+--- original/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml	2017-04-09 22:03:56.000000000 +0530
++++ patched/usr/share/lipstick-jolla-home-qt5/layers/OverlayLayer.qml	2017-04-09 22:04:29.000000000 +0530
 @@ -13,6 +13,13 @@
      Connections {
          target: root
